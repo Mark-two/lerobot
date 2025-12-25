@@ -123,6 +123,7 @@ class OpenCVCamera(Camera):
         self.stop_event: Event | None = None
         self.frame_lock: Lock = Lock()
         self.latest_frame: NDArray[Any] | None = None
+        self.last_frame_time: float = 0.0
         self.new_frame_event: Event = Event()
 
         self.rotation: int | None = get_cv2_rotation(config.rotation)
@@ -445,6 +446,7 @@ class OpenCVCamera(Camera):
 
                 with self.frame_lock:
                     self.latest_frame = color_image
+                    self.last_frame_time = time.time()
                 self.new_frame_event.set()
 
             except DeviceNotConnectedError:
@@ -502,6 +504,17 @@ class OpenCVCamera(Camera):
         if self.thread is None or not self.thread.is_alive():
             self._start_read_thread()
 
+        # If we have a frame, return it immediately without waiting
+        with self.frame_lock:
+            if self.latest_frame is not None:
+                # Check if the frame is stale (camera might be frozen)
+                if (time.time() - self.last_frame_time) * 1000 > timeout_ms:
+                    raise TimeoutError(
+                        f"Camera {self} has not updated frame for {(time.time() - self.last_frame_time)*1000:.1f} ms "
+                        f"(timeout={timeout_ms} ms). Check if camera is disconnected or frozen."
+                    )
+                return self.latest_frame
+
         if not self.new_frame_event.wait(timeout=timeout_ms / 1000.0):
             thread_alive = self.thread is not None and self.thread.is_alive()
             raise TimeoutError(
@@ -511,7 +524,8 @@ class OpenCVCamera(Camera):
 
         with self.frame_lock:
             frame = self.latest_frame
-            self.new_frame_event.clear()
+            # Don't clear the event, so subsequent calls can get the same frame if needed
+            # self.new_frame_event.clear() 
 
         if frame is None:
             raise RuntimeError(f"Internal error: Event set but no frame available for {self}.")

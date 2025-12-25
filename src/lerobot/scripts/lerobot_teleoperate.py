@@ -141,15 +141,20 @@ def teleop_loop(
 
     while True:
         loop_start = time.perf_counter()
+        
+        # Timestamp for profiling
+        t0 = time.perf_counter()
 
         # Get robot observation
         # Not really needed for now other than for visualization
         # teleop_action_processor can take None as an observation
         # given that it is the identity processor as default
         obs = robot.get_observation()
+        t1 = time.perf_counter()
 
         # Get teleop action
         raw_action = teleop.get_action()
+        t2 = time.perf_counter()
 
         # Process teleop action through pipeline
         teleop_action = teleop_action_processor((raw_action, obs))
@@ -159,6 +164,7 @@ def teleop_loop(
 
         # Send processed action to robot (robot_action_processor.to_output should return dict[str, Any])
         _ = robot.send_action(robot_action_to_send)
+        t3 = time.perf_counter()
 
         if display_data:
             # Process robot observation through pipeline
@@ -175,11 +181,21 @@ def teleop_loop(
             for motor, value in robot_action_to_send.items():
                 print(f"{motor:<{display_len}} | {value:>7.2f}")
             move_cursor_up(len(robot_action_to_send) + 3)
+        
+        t4 = time.perf_counter()
 
         dt_s = time.perf_counter() - loop_start
         precise_sleep(1 / fps - dt_s)
         loop_s = time.perf_counter() - loop_start
-        print(f"Teleop loop time: {loop_s * 1e3:.2f}ms ({1 / loop_s:.0f} Hz)")
+        
+        # Calculate timings in ms
+        read_robot_ms = (t1 - t0) * 1000
+        read_teleop_ms = (t2 - t1) * 1000
+        send_robot_ms = (t3 - t2) * 1000
+        display_ms = (t4 - t3) * 1000
+        total_ms = loop_s * 1000
+        
+        print(f"Loop: {total_ms:.2f}ms ({1 / loop_s:.0f} Hz) | RobotRead: {read_robot_ms:.1f}ms | TeleopRead: {read_teleop_ms:.1f}ms | RobotSend: {send_robot_ms:.1f}ms | Display: {display_ms:.1f}ms")
         move_cursor_up(1)
 
         if duration is not None and time.perf_counter() - start >= duration:

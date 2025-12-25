@@ -184,6 +184,8 @@ class SO101Follower(Robot):
         # Capture images from cameras
         for cam_key, cam in self.cameras.items():
             start = time.perf_counter()
+            # Use a very short timeout since we expect async_read to return immediately
+            # if a frame is available due to our changes in OpenCVCamera
             obs_dict[cam_key] = cam.async_read()
             dt_ms = (time.perf_counter() - start) * 1e3
             logger.debug(f"{self} read {cam_key}: {dt_ms:.1f}ms")
