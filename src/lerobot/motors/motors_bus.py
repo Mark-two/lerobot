@@ -463,7 +463,11 @@ class MotorsBus(abc.ABC):
         if disable_torque:
             self.port_handler.clearPort()
             self.port_handler.is_using = False
-            self.disable_torque(num_retry=5)
+            try:
+                self.disable_torque(num_retry=5)
+            except Exception as e:
+                # Log warning but continue to close port
+                logger.warning(f"Failed to disable torque during disconnect: {e}")
 
         self.port_handler.closePort()
         logger.debug(f"{self.__class__.__name__} disconnected.")

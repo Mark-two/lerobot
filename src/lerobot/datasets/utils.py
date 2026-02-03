@@ -1019,6 +1019,9 @@ def validate_features_presence(actual_features: set[str], expected_features: set
     missing_features = expected_features - actual_features
     extra_features = actual_features - expected_features
 
+    # Allow DEFAULT_FEATURES in extra_features
+    extra_features = extra_features - set(DEFAULT_FEATURES)
+
     if missing_features or extra_features:
         error_message += "Feature mismatch in `frame` dictionary:\n"
         if missing_features:

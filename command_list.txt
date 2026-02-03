@@ -1,0 +1,162 @@
+# ---------------------------------------------------------
+# 1. 基础遥控测试 (无摄像头)
+# 用于测试主手(Leader)和从手(Follower)的连接是否正常，不显示画面
+# ---------------------------------------------------------
+lerobot-teleoperate \
+    --robot.type=so101_follower \
+    --robot.port=/dev/ttyACM1 \
+    --robot.id=kang_follower_arm \
+    --teleop.type=so101_leader \
+    --teleop.port=/dev/ttyACM0 \
+    --teleop.id=kang_leader_arm
+
+# ---------------------------------------------------------
+# 2. 特殊串口 + 单摄像头测试
+# 适用于使用 CH343 等国产串口芯片的情况 (ttyCH343USB*)
+# 只启用前置摄像头 (index 0)
+# ---------------------------------------------------------
+lerobot-teleoperate \
+    --robot.type=so101_follower \
+    --robot.port=/dev/ttyCH343USB1 \
+    --robot.id=kang_follower_arm \
+    --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30, fourcc: 'MJPG'}}" \
+    --teleop.type=so101_leader \
+    --teleop.port=/dev/ttyCH343USB0 \
+    --teleop.id=kang_leader_arm \
+    --display_data=true
+
+# ---------------------------------------------------------
+# 3. 双摄像头标准遥控测试 (前置 + 侧面 Side)
+# 包含 Front(0) 和 Side(2) 两个视角，并在屏幕显示画面
+# ---------------------------------------------------------
+lerobot-teleoperate \
+    --robot.type=so101_follower \
+    --robot.port=/dev/ttyACM1 \
+    --robot.id=kang_follower_arm \
+    --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30, fourcc: 'MJPG'}, side: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30, fourcc: 'MJPG'}}" \
+    --teleop.type=so101_leader \
+    --teleop.port=/dev/ttyACM0 \
+    --teleop.id=kang_leader_arm \
+    --display_data=true
+
+# ---------------------------------------------------------
+# 4. 单摄像头遥控测试 (仅前置)
+# 仅启用 index 0 摄像头
+# ---------------------------------------------------------
+lerobot-teleoperate \
+    --robot.type=so101_follower \
+    --robot.port=/dev/ttyACM1 \
+    --robot.id=kang_follower_arm \
+    --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30, fourcc: 'MJPG'}}" \
+    --teleop.type=so101_leader \
+    --teleop.port=/dev/ttyACM0 \
+    --teleop.id=kang_leader_arm \
+    --display_data=true
+
+# ---------------------------------------------------------
+# 5. 双摄像头测试 (同第3条，备份用)
+# ---------------------------------------------------------
+lerobot-teleoperate \
+    --robot.type=so101_follower \
+    --robot.port=/dev/ttyACM1 \
+    --robot.id=kang_follower_arm \
+    --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30, fourcc: 'MJPG'}, side: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30, fourcc: 'MJPG'}}" \
+    --teleop.type=so101_leader \
+    --teleop.port=/dev/ttyACM0 \
+    --teleop.id=kang_leader_arm \
+    --display_data=true
+
+# ---------------------------------------------------------
+# 6. 录制训练数据 (Recording for Training)
+# 录制 5 集数据，任务为 "Grab the black ball"
+# 注意：此处摄像头配置使用了 'wrist' (手腕) 而非 'side'
+# 数据会自动上传到 HuggingFace: mark-two/test
+# ---------------------------------------------------------
+lerobot-record \
+    --robot.type=so101_follower \
+    --robot.port=/dev/ttyACM0 \
+    --robot.id=kang_follower_arm \
+    --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30, fourcc: 'MJPG'}, wrist: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30, fourcc: 'MJPG'}}" \
+    --teleop.type=so101_leader \
+    --teleop.port=/dev/ttyACM1 \
+    --teleop.id=kang_leader_arm \
+    --display_data=true \
+    --dataset.repo_id=mark-two/test \    #注意要改名字
+    --dataset.num_episodes=5 \
+    --dataset.single_task="Grab the black ball" \
+    --dataset.push_to_hub=true \
+    --dataset.episode_time_s=10 \
+    --dataset.reset_time_s=5 
+
+
+    #手动上传数据
+    huggingface-cli upload --repo-type dataset mark-two/testpart2 ~/.cache/huggingface/lerobot/mark-two/testpart2 .
+
+# ---------------------------------------------------------
+# 7. 数据缓存路径 (Reference)
+# 录制的数据在本地存放的位置
+# ---------------------------------------------------------
+/home/kang/.cache/huggingface/lerobot/mark-two/test
+
+# ---------------------------------------------------------
+# 8. 模型训练 (Training)
+# 使用 ACT 算法训练，步数 30万，使用 CUDA 加速
+# 开启 wandb 监控，输出目录为 outputs/train/act_so101_test
+# ---------------------------------------------------------
+lerobot-train \
+  --dataset.repo_id=mark-two/merged_dataset_all \
+  --policy.type=act \
+  --output_dir=outputs/train/act_so101_test1 \
+  --job_name=act_so101_test \
+  --policy.device=cuda \
+  --wandb.enable=true \
+  --steps=300000 \
+  --policy.repo_id=mark-two/act_so101_test1 
+
+
+
+  lerobot-train \
+  --dataset.repo_id=mark-two/merged_dataset_all \
+  --policy.type=act \
+  --output_dir=outputs/train/act_so101_test1 \
+  --job_name=act_so101_test \
+  --policy.device=cuda \
+  --wandb.enable=true \
+  --steps=50000 \
+  --policy.repo_id=mark-two/act_so101_test1 \
+  --batch_size=32 \
+  --num_workers=8 \
+  --policy.use_amp=true
+  --save_freq=5000
+
+# ---------------------------------------------------------
+# 9. 数据可视化 (Visualization - Export)
+# 将第 0 集数据导出为 RRD 文件，方便检查录制质量
+# ---------------------------------------------------------
+lerobot-dataset-viz \
+    --repo-id mark-two/test \
+    --episode-index 0 \
+    --save 1 \
+    --output-dir ./viz_output
+
+# ---------------------------------------------------------
+# 10. 本地查看可视化文件 (Rerun)
+# 安装查看器并打开刚才导出的 .rrd 文件
+# ---------------------------------------------------------
+pip install rerun-sdk
+rerun mark-two_test_episode_0.rrd
+
+# ---------------------------------------------------------
+# 11. 模型评估/推理 (Evaluation)
+# 让 AI (训练好的模型) 接管控制机械臂，并录制评估视频
+# 注意：repo_id 必须以 eval_ 开头
+# ---------------------------------------------------------
+lerobot-record \
+  --robot.type=so101_follower \
+  --robot.port=/dev/ttyACM0 \
+  --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30, fourcc: 'MJPG'},   wrist: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30,fourcc: 'MJPG'}}" \
+  --robot.id=kang_follower_arm \
+  --display_data=true \
+  --dataset.repo_id=mark-two/eval_test1 \
+  --dataset.single_task="Grab the black ball" \
+  --policy.path=outputs/train/act_so101_test1/checkpoints/last/pretrained_model
